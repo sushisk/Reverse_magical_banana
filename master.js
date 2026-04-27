@@ -113,10 +113,10 @@
         ui.cpuWord.textContent = '';
         const main = document.createElement('div');
         main.className = 'cpuMain';
-        main.textContent = `["${word}"`;
+        main.textContent = `"${word}"`;
         const sub = document.createElement('div');
         sub.className = 'cpuSub';
-        sub.textContent = 'といわなかったら？]';
+        sub.textContent = 'といわなかったら？';
         ui.cpuWord.append(main, sub);
     };
 
