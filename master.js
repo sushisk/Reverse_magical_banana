@@ -5,7 +5,7 @@
     const CFG = {
         rounds: 10,
         limitSec: 10,
-        sampleCount: 200,
+        sampleCount: 100,
         penaltyScore: 0,
     };
 
