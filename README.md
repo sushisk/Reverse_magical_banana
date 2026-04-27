@@ -1,8 +1,7 @@
 https://sushisk.github.io/Reverse_magical_banana/
-
-ここで遊べます
-available here
-
 提示された単語と関係ない単語を返すゲームです
+↑ ここで遊べます
+↑ available here
 
-Thanks to tohoku word2vec
+Tohoku word2vecから上位300000語を抜き出し、名詞を選んで辞書を作成しました。
+お題の単語と、ユーザーが提示した単語とランダムに選んだ300語の距離を計算します。ユーザーが提示した単語の距離が300語のうち上位何%に属するかを計算してスコアとして算出します。
