@@ -5,7 +5,7 @@
     const CFG = {
         rounds: 10,
         limitSec: 10,
-        sampleCount: 100,
+        sampleCount: 200,
         penaltyScore: 0,
     };
 
@@ -14,6 +14,8 @@
     const clamp01 = (x) => Math.min(1, Math.max(0, x));
 
     let running = false;
+    let dataReady = false;
+    let loading = false;
     let round = 0;
     let cpuWord = '';
     let scores = [];
@@ -55,6 +57,7 @@
         submitBtn: null,
         lastScore: null,
         avgScore: null,
+        restartBtn: null,
         log: null,
         chat: null,
         timerRing: null,
@@ -67,10 +70,14 @@
         el.classList.toggle('hidden', Boolean(hidden));
     };
 
+    const updateStartEnabled = () => {
+        if (!ui.startBtn) return;
+        ui.startBtn.disabled = running || loading || !dataReady;
+    };
+
     const setPlaying = (playing) => {
         ui.userWord.disabled = !playing;
         ui.submitBtn.disabled = !playing;
-        ui.startBtn.disabled = playing;
     };
 
     const setStatus = (t) => {
@@ -95,6 +102,22 @@
         if (!ui.timerRing) return;
         const used = clamp01(used01);
         ui.timerRing.style.strokeDashoffset = String(ui.ringCirc * (1 - used));
+    };
+
+    const renderCpuPrompt = (word) => {
+        if (!ui.cpuWord) return;
+        if (!word) {
+            ui.cpuWord.textContent = '-';
+            return;
+        }
+        ui.cpuWord.textContent = '';
+        const main = document.createElement('div');
+        main.className = 'cpuMain';
+        main.textContent = `["${word}"`;
+        const sub = document.createElement('div');
+        sub.className = 'cpuSub';
+        sub.textContent = 'といわなかったら？]';
+        ui.cpuWord.append(main, sub);
     };
 
     const appendChatCpuOnly = (cpu) => {
@@ -160,6 +183,8 @@
         setPlaying(false);
         setRingProgressUsed(1);
         setStatus(`ゲーム終了: 平均スコア ${fmt(avgScore())}`);
+        setHidden(ui.restartBtn, false);
+        updateStartEnabled();
         log(`--- END (avg=${fmt(avgScore())}) ---`);
     };
 
@@ -168,7 +193,7 @@
         locked = false;
 
         ui.round.textContent = String(round);
-        ui.cpuWord.textContent = cpuWord || '-';
+        renderCpuPrompt(cpuWord);
         ui.userWord.value = '';
         ui.timeLeft.textContent = String(CFG.limitSec);
         setRingProgressUsed(0);
@@ -242,44 +267,20 @@
         startRound();
     };
 
-    const startGame = async () => {
-        if (running) return;
-
+    const beginGame = () => {
+        if (!dataReady) return;
         ui.log.textContent = '';
         ui.chat.textContent = '';
         ui.round.textContent = '-';
-        ui.cpuWord.textContent = '-';
+        renderCpuPrompt('');
         ui.timeLeft.textContent = '-';
         ui.lastScore.textContent = '-';
         ui.avgScore.textContent = '-';
         setRingProgressUsed(0);
-
-        setPlaying(false);
-        ui.startBtn.disabled = true;
-        setStatus('データ読み込み中...');
-
-        try {
-            await window.Scoring.ensureReady();
-        } catch (err) {
-            console.error(err);
-            setStatus('読み込みに失敗しました。ローカルサーバーで開いてください。');
-            log(String(err));
-            ui.startBtn.disabled = false;
-            setHidden(ui.startBtn, false);
-            return;
-        }
-        if (!window.Scoring.getWordToPick().length) {
-            setStatus('word_to_pick が空です');
-            ui.startBtn.disabled = false;
-            setHidden(ui.startBtn, false);
-            return;
-        }
-
-        // After dictionary load: hide Start button and show inner controls.
-        setHidden(ui.startBtn, true);
-        setHidden(ui.innerPanel, false);
+        setHidden(ui.restartBtn, true);
 
         running = true;
+        updateStartEnabled();
         round = 0;
         scores = [];
         cpuWord = pickRandom();
@@ -287,6 +288,47 @@
         log('--- START ---');
         appendChatCpuOnly(cpuWord);
         startRound();
+    };
+
+    const preloadData = async () => {
+        if (loading || dataReady) return;
+        loading = true;
+        updateStartEnabled();
+        setStatus('データ読み込み中...');
+
+        try {
+            await window.Scoring.ensureReady();
+            if (!window.Scoring.getWordToPick().length) throw new Error('word_to_pick is empty');
+            dataReady = true;
+            setStatus('Start を押してください');
+        } catch (err) {
+            console.error(err);
+            dataReady = false;
+            setStatus('読み込みに失敗しました。ローカルサーバーで開いてください。');
+            log(String(err));
+        } finally {
+            loading = false;
+            updateStartEnabled();
+        }
+    };
+
+    const startGame = () => {
+        if (running) return;
+        if (!dataReady) return;
+
+        // Start: hide Start button and show inner controls.
+        setHidden(ui.startArea, true);
+        setHidden(ui.innerPanel, false);
+        setStatus('');
+
+        beginGame();
+    };
+
+    const restartGame = () => {
+        if (running) return;
+        if (!dataReady) return;
+        setStatus('');
+        beginGame();
     };
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -302,6 +344,7 @@
             submitBtn: byId('submitBtn'),
             lastScore: byId('lastScore'),
             avgScore: byId('avgScore'),
+            restartBtn: byId('restartBtn'),
             log: byId('log'),
             chat: byId('chat'),
             timerRing: byId('timerRing'),
@@ -333,17 +376,24 @@
 
         ui.roundTotal.textContent = String(CFG.rounds);
         initRing();
+        updateStartEnabled();
 
         ui.startBtn.addEventListener('click', startGame);
+        ui.restartBtn?.addEventListener('click', restartGame);
         ui.submitBtn.addEventListener('click', () => submit(false));
         ui.userWord.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') submit(false);
         });
 
         // Initial state: show Start button in ring; hide inner controls.
-        setHidden(ui.startBtn, false);
+        setHidden(ui.startArea, false);
         setHidden(ui.innerPanel, true);
+        setHidden(ui.restartBtn, true);
         setPlaying(false);
-        setStatus('Start を押してください');
+        dataReady = false;
+        loading = false;
+        updateStartEnabled();
+        setStatus('データ読み込み中...');
+        void preloadData();
     });
 })();

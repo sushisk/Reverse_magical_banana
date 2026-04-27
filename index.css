@@ -277,6 +277,18 @@ body {
     word-break: break-word;
 }
 
+.cpuMain {
+    font-size: 1em;
+}
+
+.cpuSub {
+    margin-top: 6px;
+    font-size: 0.62em;
+    font-weight: 750;
+    color: var(--muted);
+    letter-spacing: 0.1px;
+}
+
 .inputRow {
     display: flex;
     align-items: center;
@@ -304,6 +316,12 @@ body {
     gap: 14px;
     color: var(--muted);
     font-size: 13px;
+}
+
+.actions {
+    display: flex;
+    justify-content: center;
+    width: 100%;
 }
 
 .chatCard {

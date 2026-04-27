@@ -13,6 +13,10 @@
 
     const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
 
+    const CACHE_DB = 'reverse_magical_banana_cache';
+    const CACHE_STORE = 'kv';
+    const CACHE_VERSION = 1;
+
     function makeXorshift32(seed) {
         let x = seed | 0;
         return () => {
@@ -22,6 +26,77 @@
             x ^= x << 5;
             return (x >>> 0) / 4294967296;
         };
+    }
+
+    function openCacheDb() {
+        if (!('indexedDB' in window)) return Promise.resolve(null);
+        return new Promise((resolve) => {
+            const req = indexedDB.open(CACHE_DB, 1);
+            req.onupgradeneeded = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains(CACHE_STORE)) db.createObjectStore(CACHE_STORE);
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => resolve(null);
+        });
+    }
+
+    function idbGet(db, key) {
+        return new Promise((resolve) => {
+            const tx = db.transaction(CACHE_STORE, 'readonly');
+            const store = tx.objectStore(CACHE_STORE);
+            const req = store.get(key);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => resolve(undefined);
+        });
+    }
+
+    function idbSet(db, key, value) {
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(CACHE_STORE, 'readwrite');
+            const store = tx.objectStore(CACHE_STORE);
+            const req = store.put(value, key);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error || new Error('idb put failed'));
+        });
+    }
+
+    async function loadVectorsFromCache() {
+        const db = await openCacheDb();
+        if (!db) return null;
+        try {
+            const meta = await idbGet(db, 'meta');
+            if (!meta || meta.version !== CACHE_VERSION) return null;
+
+            const [v0, v1, v2, wordToPick] = await Promise.all([
+                idbGet(db, 'vectors_0'),
+                idbGet(db, 'vectors_1'),
+                idbGet(db, 'vectors_2'),
+                idbGet(db, 'word_to_pick'),
+            ]);
+
+            if (!v0 || !v1 || !v2) return null;
+            if (!Array.isArray(wordToPick)) return null;
+            return { v0, v1, v2, wordToPick };
+        } finally {
+            db.close();
+        }
+    }
+
+    async function saveVectorsToCache({ v0, v1, v2, wordToPick }) {
+        const db = await openCacheDb();
+        if (!db) return;
+        try {
+            await idbSet(db, 'meta', { version: CACHE_VERSION, savedAt: Date.now() });
+            await idbSet(db, 'vectors_0', v0);
+            await idbSet(db, 'vectors_1', v1);
+            await idbSet(db, 'vectors_2', v2);
+            await idbSet(db, 'word_to_pick', wordToPick);
+        } catch {
+            // Best-effort cache. Quota errors are ignored.
+        } finally {
+            db.close();
+        }
     }
 
     async function fetchJson(path) {
@@ -36,6 +111,12 @@
         if (state.ready) return;
         if (!state.readyPromise) {
             state.readyPromise = (async () => {
+                const cached = await loadVectorsFromCache();
+                if (cached) {
+                    state.vectors = null;
+                    state.vectorsParts = [cached.v0, cached.v1, cached.v2];
+                    state.wordToPick = cached.wordToPick;
+                } else {
                 try {
                     const [v0, v1, v2, wordToPick] = await Promise.all([
                         fetchJson('./json/vectors_0.json'),
@@ -46,6 +127,9 @@
                     state.vectors = null;
                     state.vectorsParts = [v0, v1, v2];
                     state.wordToPick = Array.isArray(wordToPick) ? wordToPick : [];
+                    queueMicrotask(() => {
+                        void saveVectorsToCache({ v0, v1, v2, wordToPick: state.wordToPick });
+                    });
                 } catch {
                     // Backward compatibility: allow single-file vectors.json.
                     const [vAll, wordToPick] = await Promise.all([
@@ -56,6 +140,10 @@
                     state.vectorsParts = null;
                     state.wordToPick = Array.isArray(wordToPick) ? wordToPick : [];
                 }
+                }
+
+                // Filter to words that actually exist in the loaded vectors.
+                state.wordToPick = state.wordToPick.filter((w) => Boolean(getVec(w)));
 
                 // Build a deterministic global distance CDF for score normalization.
                 // Raw cosine-distance tends to cluster; mapping to a percentile gives more readable scores.
