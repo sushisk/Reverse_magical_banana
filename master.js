@@ -116,7 +116,7 @@
         main.textContent = `"${word}"`;
         const sub = document.createElement('div');
         sub.className = 'cpuSub';
-        sub.textContent = 'といわなかったら？';
+        sub.textContent = 'と言わなかったら？';
         ui.cpuWord.append(main, sub);
     };
 
