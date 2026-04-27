@@ -191,7 +191,7 @@
 
         const cpuShown = cpuWord;
         const userWord = ui.userWord.value.trim();
-        let score = 0;
+        let score = CFG.penaltyScore;
         let note = '';
 
         if (timedOut || !userWord) {
@@ -215,16 +215,16 @@
         log(`#${round} CPU=${cpuShown} USER=${userShown} score=${fmt(score)}${extra}`);
 
         let cpuReply = '';
-        let cpuScore = 0;
+        let cpuScore = CFG.penaltyScore;
         const includeCpu = round < CFG.rounds;
         if (includeCpu) {
             cpuReply = nextCpuWord(userWord);
             if (!timedOut && userWord && wordOk(userWord) && wordOk(cpuReply)) {
                 const m = window.Scoring.score(userWord, cpuReply);
                 if (m.ok && Number.isFinite(m.score)) cpuScore = m.score;
-                else cpuScore = 0;
+                else cpuScore = CFG.penaltyScore;
             } else {
-                cpuScore = 0;
+                cpuScore = CFG.penaltyScore;
             }
         }
 

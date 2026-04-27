@@ -1,9 +1,10 @@
-// scoring.js
+﻿// scoring.js
 (() => {
     'use strict';
 
     const state = {
-        vectors: null,
+        vectors: null, // legacy single-file mode
+        vectorsParts: null, // [obj, obj, obj] for split files
         wordToPick: [],
         scoreCdf: null,
         ready: false,
@@ -35,7 +36,6 @@
         if (state.ready) return;
         if (!state.readyPromise) {
             state.readyPromise = (async () => {
-                let vectors = null;
                 try {
                     const [v0, v1, v2, wordToPick] = await Promise.all([
                         fetchJson('./json/vectors_0.json'),
@@ -43,22 +43,18 @@
                         fetchJson('./json/vectors_2.json'),
                         fetchJson('./json/word_to_pick.json'),
                     ]);
-                    vectors = Object.assign({}, v0, v1, v2);
-                    state.vectors = vectors;
-                    state.wordToPick = Array.isArray(wordToPick)
-                        ? wordToPick.filter((w) => Boolean(vectors[w]))
-                        : [];
+                    state.vectors = null;
+                    state.vectorsParts = [v0, v1, v2];
+                    state.wordToPick = Array.isArray(wordToPick) ? wordToPick : [];
                 } catch {
                     // Backward compatibility: allow single-file vectors.json.
                     const [vAll, wordToPick] = await Promise.all([
                         fetchJson('./json/vectors.json'),
                         fetchJson('./json/word_to_pick.json'),
                     ]);
-                    vectors = vAll;
-                    state.vectors = vectors;
-                    state.wordToPick = Array.isArray(wordToPick)
-                        ? wordToPick.filter((w) => Boolean(vectors[w]))
-                        : [];
+                    state.vectors = vAll;
+                    state.vectorsParts = null;
+                    state.wordToPick = Array.isArray(wordToPick) ? wordToPick : [];
                 }
 
                 // Build a deterministic global distance CDF for score normalization.
@@ -90,17 +86,32 @@
         return state.readyPromise;
     }
 
-    // 戻り値: { ok, distance, cosine, reason }
+    function getVec(word) {
+        const parts = state.vectorsParts;
+        if (parts) {
+            for (const p of parts) {
+                const v = p[word];
+                if (Array.isArray(v)) return v;
+            }
+            return null;
+        }
+        const all = state.vectors;
+        if (!all) return null;
+        const v = all[word];
+        return Array.isArray(v) ? v : null;
+    }
+
+    // Returns: { ok, distance, cosine, reason }
     function measure(wordA, wordB) {
-        if (!state.vectors) {
+        if (!state.vectors && !state.vectorsParts) {
             return { ok: false, distance: NaN, cosine: NaN, reason: 'not_ready' };
         }
-        const vecA = state.vectors[wordA];
-        if (!Array.isArray(vecA)) {
+        const vecA = getVec(wordA);
+        if (!vecA) {
             return { ok: false, distance: NaN, cosine: NaN, reason: 'missing_a' };
         }
-        const vecB = state.vectors[wordB];
-        if (!Array.isArray(vecB)) {
+        const vecB = getVec(wordB);
+        if (!vecB) {
             return { ok: false, distance: NaN, cosine: NaN, reason: 'missing_b' };
         }
         if (vecA.length !== vecB.length) {
@@ -111,8 +122,8 @@
         let normA = 0;
         let normB = 0;
         for (let i = 0; i < vecA.length; i++) {
-            const a = Number(vecA[i]);
-            const b = Number(vecB[i]);
+            const a = vecA[i];
+            const b = vecB[i];
             dot += a * b;
             normA += a * a;
             normB += b * b;
@@ -137,10 +148,10 @@
             else hi = mid;
         }
         const percentile = lo / cdf.length;
-        return percentile * 200;
+        return percentile * 100;
     }
 
-    // Score: 0..200 (percentile of global distance distribution).
+    // Score: 0..100 (percentile of global distance distribution).
     function score(wordA, wordB) {
         const m = measure(wordA, wordB);
         if (!m.ok) return { ok: false, score: NaN, distance: NaN, cosine: NaN, reason: m.reason };
@@ -159,7 +170,6 @@
         return null;
     }
 
-    // ランダムに重複なしで選ぶ（count=1でも配列を返す）
     function pickWords(count, exclude) {
         const list = state.wordToPick;
         if (!list.length) return [];
