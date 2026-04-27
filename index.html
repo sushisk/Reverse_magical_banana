@@ -1,0 +1,94 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Reverse Magical Banana</title>
+    <meta name="keywords" content="逆マジカルバナナ,マジカルバナナ,magical banana,reverse magical banana,ゲーム,game,AI,逆連想,連想,意味的距離,semantic distance">
+    <meta name="description" content="逆マジカルバナナ：提示された単語となるべく関係ない単語を入力するゲーム">
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <div id="titleBox" class="titleBox">
+                <h1 class="title">🍌逆！マジカルバナナ🍌</h1>
+            </div>
+
+            <div id="howtoBox" class="howtoBox">
+                <div id="howtoSizer" class="howtoSizer" aria-hidden="true">・提示した単語と、あなたの入力した単語の関係のなさをscoreとして表示します</div>
+                <details class="howto">
+                    <summary class="howtoSummary">遊び方</summary>
+                    <div class="howtoPanel">
+                        <div>・提示された単語となるべく関係ない単語を入力してください</div>
+                        <div>・提示した単語と、あなたの入力した単語の関係のなさをスコアとして表示します</div>
+                        <div>・周囲にあるものなどを参考にせず、頭の中で考えて下さい</div>
+                        <div>・ひらがな、カタカナより漢字の方が単語が見つかりやすいです</div>
+                        <div>・cpuはあなたの入力した単語となるべく関係ない単語を返します</div>
+                        <div>・10往復してなるべくスコアを大きくしてください</div>
+                    </div>
+                </details>
+            </div>
+        </header>
+
+        <main class="main">
+            <section class="timerCard" aria-label="Timer">
+                <div class="timerWrap">
+                    <svg class="ring" viewBox="0 0 120 120" role="img" aria-label="Timer ring">
+                        <circle class="ringBg" cx="60" cy="60" r="54"></circle>
+                        <circle class="ringFg" id="timerRing" cx="60" cy="60" r="54"></circle>
+                    </svg>
+
+                    <div class="timerInner">
+                        <div id="startArea" class="startArea">
+                            <button id="startBtn" class="btn startInRing">Start</button>
+                            <div id="status" class="status inRing" aria-live="polite"></div>
+                        </div>
+
+                        <div id="innerPanel" class="innerPanel hidden">
+                            <div class="meta">
+                                <div class="metaItem">
+                                    <span class="metaLabel">ターン</span>
+                                    <span class="metaValue"><span id="round">-</span>/<span id="roundTotal">10</span></span>
+                                </div>
+                                <div class="metaItem">
+                                    <span class="metaLabel">残り</span>
+                                    <span class="metaValue"><span id="timeLeft">-</span>s</span>
+                                </div>
+                            </div>
+
+                            <div class="cpu">
+                                <div class="cpuLabel">CPUの提示した単語</div>
+                                <div id="cpuWord" class="cpuWord">-</div>
+                            </div>
+
+                            <div class="inputRow">
+                                <input id="userWord" class="text" type="text" placeholder="単語を入力" autocomplete="off" disabled>
+                                <button id="submitBtn" class="btn primary" disabled>送信</button>
+                            </div>
+
+                            <div class="scores" aria-label="Scores">
+                                <div class="scoreItem">今回: <span id="lastScore">-</span></div>
+                                <div class="scoreItem">平均: <span id="avgScore">-</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="chatCard" aria-label="History">
+                <div class="sectionTitle">履歴</div>
+                <div id="chat" class="chat" aria-live="polite"></div>
+            </section>
+
+            <details class="debug">
+                <summary>Debug log</summary>
+                <pre id="log"></pre>
+            </details>
+        </main>
+    </div>
+
+    <script src="scoring.js"></script>
+    <script src="master.js"></script>
+</body>
+</html>
