@@ -6,7 +6,7 @@
         rounds: 10,
         limitSec: 10,
         sampleCount: 100,
-        penaltyScore: 200,
+        penaltyScore: 0,
     };
 
     const byId = (id) => document.getElementById(id);
